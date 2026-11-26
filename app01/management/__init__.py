@@ -1,0 +1,1 @@
+# management 命令包：app01/management/commands/init_data.py

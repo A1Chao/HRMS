@@ -1,0 +1,137 @@
+{% extends 'layout.html' %}
+{% load rbac avatars %}
+
+{% block title %}系统用户列表{% endblock %}
+
+{% block content %}
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap">
+        {% has_perm "user.edit" as can_edit %}
+        {% if can_edit %}
+            <a class="btn btn-success" href="/admin/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新建系统用户
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form method="get" style="margin: 0">
+            <div class="input-group" style="width: 300px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="用户名 / 姓名 / 员工姓名">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <div class="alert alert-info" style="margin-bottom: 10px">
+        所属部门来自关联员工档案，负责部门表示管理范围，两者并不等同。
+        普通员工的负责部门为“不适用”；部门管理员必须关联员工，系统超级管理员可以独立存在。
+        账号手机号可以单独维护；空姓名、手机号仅从已关联的员工档案回退显示，已有联系方式不会被覆盖。
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-th-list" aria-hidden="true"></span>
+            系统用户列表（共 {{ total_count }} 个）
+            <span class="text-muted">高权限账号优先；密码以安全哈希保存，不在列表展示</span>
+        </div>
+        <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>姓名</th>
+                <th>手机号</th>
+                <th>邮箱</th>
+                <th>角色</th>
+                <th>所属部门</th>
+                <th>负责部门</th>
+                <th>关联员工</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td>
+                        <span class="account-with-avatar">
+                            <img class="user-avatar" src="{% url 'avatar_image' obj.id %}" alt="" aria-hidden="true">
+                            <span>{{ obj.username }}</span>
+                        </span>
+                    </td>
+                    <td>{{ obj.profile_name|default:"未填写" }}</td>
+                    <td>{{ obj.profile_phone|default:"未填写" }}</td>
+                    <td>{{ obj.email|default:"未填写" }}</td>
+                    <td>
+                        {% for role in obj.roles.all %}
+                            <span class="label label-info">{{ role.name }}</span>
+                        {% empty %}
+                            <span class="text-muted">未分配</span>
+                        {% endfor %}
+                    </td>
+                    <td>{{ obj.employee.department.title|default:"未关联员工" }}</td>
+                    <td>
+                        {% if obj.managed_department_id %}
+                            {{ obj.managed_department.title }}
+                        {% elif obj.is_superuser %}
+                            <span class="text-muted">全部部门</span>
+                        {% elif "部门管理员" in obj.role_names %}
+                            <span class="text-danger">未设置</span>
+                        {% else %}
+                            <span class="text-muted">不适用</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ obj.employee.name|default:"未关联" }}</td>
+                    <td>
+                        {% if obj.is_active %}
+                            <span class="label label-success">启用</span>
+                        {% else %}
+                            <span class="label label-default">禁用</span>
+                        {% endif %}
+                        {% if obj.is_superuser %}
+                            <span class="label label-danger">超级管理员</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% can_manage_avatar obj as can_manage_user_avatar %}
+                        {% if can_manage_user_avatar %}
+                            <a class="btn btn-info btn-xs avatar-manage-link" href="{% url 'avatar_edit' obj.id %}">管理头像</a>
+                        {% endif %}
+                        {% if obj.can_manage_account %}
+                            <a class="btn btn-primary btn-xs" href="/admin/{{ obj.id }}/edit/">编辑</a>
+                            <a class="btn btn-warning btn-xs" href="/admin/{{ obj.id }}/reset/">重置密码</a>
+                            {% if obj.id != request.user.id %}
+                                <form method="post" action="/admin/delete/" style="display: inline"
+                                      onsubmit="return confirm('确定删除该用户吗？');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="nid" value="{{ obj.id }}">
+                                    <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}

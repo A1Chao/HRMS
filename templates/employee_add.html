@@ -1,0 +1,58 @@
+{% extends 'layout.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-heading">{{ title }}</div>
+    <div class="panel-body">
+        {# 员工与账号仍为两个模型，只在这个新增流程中以事务一起提交。 #}
+        <form method="post" novalidate style="max-width: 500px">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <h4>员工档案</h4>
+            {% for field in form.employee_fields %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="help-block">{{ field.help_text }}</p>{% endif %}
+                    <span class="text-danger">{{ field.errors.0 }}</span>
+                </div>
+            {% endfor %}
+            <hr>
+            <div class="checkbox">
+                <label>{{ form.create_login }} {{ form.create_login.label }}</label>
+            </div>
+            <span class="text-danger">{{ form.create_login.errors.0 }}</span>
+            {% if form.create_login.help_text %}<p class="help-block">{{ form.create_login.help_text }}</p>{% endif %}
+            {% if form.can_open_login %}
+                <fieldset id="employee-login-fields">
+                    <p class="help-block">默认勾选。新账号仅授予普通员工权限；取消勾选只保存档案，不创建账号或工资。</p>
+                    <div class="form-group">
+                        <label for="{{ form.login_username.id_for_label }}">{{ form.login_username.label }}</label>
+                        {{ form.login_username }}<p class="help-block">{{ form.login_username.help_text }}</p>
+                        <span class="text-danger">{{ form.login_username.errors.0 }}</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ form.initial_password.id_for_label }}">{{ form.initial_password.label }}</label>
+                        {{ form.initial_password }}<p class="help-block">{{ form.initial_password.help_text }}</p>
+                        <span class="text-danger">{{ form.initial_password.errors.0 }}</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ form.confirm_initial_password.id_for_label }}">{{ form.confirm_initial_password.label }}</label>
+                        {{ form.confirm_initial_password }}
+                        <span class="text-danger">{{ form.confirm_initial_password.errors.0 }}</span>
+                    </div>
+                </fieldset>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a class="btn btn-default" href="{{ back_url }}">返回</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/employee-onboarding.js' %}"></script>
+{% endblock %}

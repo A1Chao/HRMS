@@ -1,0 +1,86 @@
+{% extends 'layout.html' %}
+{% load rbac %}
+
+{% block title %}靓号列表{% endblock %}
+
+{% block content %}
+    {% has_perm "pretty.edit" as can_edit %}
+    <!-- 工具栏：左侧新建按钮，右侧搜索框（同一行、两端对齐） -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px">
+        {% if can_edit %}
+            <a class="btn btn-success" href="/pretty/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新建靓号
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form method="get" style="margin: 0">
+            <div class="input-group" style="width: 360px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search for...">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <div class="panel panel-default">
+        <!-- Default panel contents -->
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-th-list" aria-hidden="true"></span>
+            靓号列表
+        </div>
+        <!-- Table -->
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>号码</th>
+                <th>价格</th>
+                <th>级别</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td>{{ obj.mobile }}</td>
+                    <td>{{ obj.price }}</td>
+                    <td>{{ obj.get_level_display }}</td>
+                    <td>{{ obj.get_status_display }}</td>
+                    <td>
+                        {% if can_edit %}
+                            <a class="btn btn-primary btn-xs" href="/pretty/{{ obj.id }}/edit/">编辑</a>
+                            <form method="post" action="/pretty/delete/" style="display: inline"
+                                  onsubmit="return confirm('确定删除该靓号吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="nid" value="{{ obj.id }}">
+                                <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# page_string 里是 <li>...</li>，外面用 Bootstrap 的 <ul class="pagination"> 包一层 #}
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'layout.html' %}
+{% load rbac avatars static %}
+
+{% block title %}员工列表{% endblock %}
+
+{% block content %}
+{# queryset 已由视图按账号范围、姓名/部门/职位过滤、领导优先排序并分页；不要在模板里再次临时排序整页。 #}
+    <!-- 工具栏：左侧新建按钮，右侧“姓名模糊搜索 + 部门/职位筛选” -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap">
+        {% has_perm "employee.edit" as can_edit %}
+        {% if can_edit %}
+            <a class="btn btn-success" href="/user/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新建员工
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form id="employee-filter-form" method="get" style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px">
+            <select name="department_id" data-auto-submit aria-label="所属部门" class="form-control" style="width: 160px">
+                <option value="">全部部门</option>
+                {% for depart in departments %}
+                    <option value="{{ depart.id }}"
+                            {% if department_id == depart.id|stringformat:"s" %}selected{% endif %}>
+                        {{ depart.title }}
+                    </option>
+                {% endfor %}
+            </select>
+            <select name="position" data-auto-submit aria-label="职位" class="form-control" style="width: 170px">
+                <option value="">全部职位</option>
+                {% for item in positions %}
+                    <option value="{{ item }}" {% if position == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+            </select>
+            <div class="input-group" style="width: 300px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="按姓名搜索">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <div class="alert alert-info">标记“测试数据”的职位、手机号等为演示资料，不能用于真实人事或对外联系。关联账号或已有考勤、工资的员工档案受删除保护。</div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
+            员工列表（共 {{ total_count }} 人）<span class="text-muted"> · 默认领导岗位优先</span>
+        </div>
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>头像</th>
+                <th>姓名</th>
+                <th>职位</th>
+                <th>性别</th>
+                <th>年龄</th>
+                <th>手机号</th>
+                <th>所属部门</th>
+                <th>账户余额</th>
+                <th>入职时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td class="employee-avatar-cell">
+                        {% with avatar_account=obj.user_account %}
+                            {% if avatar_account %}
+                                <img class="user-avatar" src="{% url 'avatar_image' avatar_account.id %}" alt="{{ obj.name }}的头像">
+                                {% can_manage_avatar avatar_account as can_manage_employee_avatar %}
+                                {% if can_manage_employee_avatar %}
+                                    <div><a class="btn btn-info btn-xs avatar-manage-link" href="{% url 'avatar_edit' avatar_account.id %}">管理头像</a></div>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">未开通登录账号</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>{{ obj.name }}{% if obj.is_demo %} <span class="label label-warning">测试数据</span>{% endif %}</td>
+                    <td class="employee-position">{{ obj.position|default:"-" }}</td>
+                    <td>{{ obj.get_gender_display }}</td>
+                    <td>{{ obj.age }}</td>
+                    <td>{{ obj.mobile }}</td>
+                    <td>{{ obj.department.title }}</td>
+                    <td>{{ obj.account }}</td>
+                    <td>{{ obj.create_time|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if can_edit %}
+                            <a class="btn btn-primary btn-xs" href="/user/{{ obj.id }}/edit/">编辑</a>
+                            <form method="post" action="/user/delete/" style="display: inline"
+                                  onsubmit="return confirm('确定删除该员工吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="nid" value="{{ obj.id }}">
+                                <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}
+{% block extra_js %}
+    <script src="{% static 'js/list-filters.js' %}"></script>
+{% endblock %}

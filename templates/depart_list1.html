@@ -1,0 +1,79 @@
+{% extends 'layout.html' %}
+{% load rbac %}
+
+{% block title %}部门列表{% endblock %}
+
+{% block content %}
+    <!-- 工具栏：左侧新建按钮（按权限显示），右侧搜索框 -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px">
+        {% has_perm "depart.edit" as can_edit %}
+        {% if can_edit %}
+            <a class="btn btn-success" href="/depart/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新建部门
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form method="get" style="margin: 0">
+            <div class="input-group" style="width: 300px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="部门名称">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-th-list" aria-hidden="true"></span>
+            部门列表（共 {{ total_count }} 个）
+        </div>
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>名称</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td>{{ obj.title }}</td>
+                    <td>{{ obj.create_time|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if can_edit %}
+                            <a class="btn btn-primary btn-xs" href="/depart/{{ obj.id }}/edit/">编辑</a>
+                            <form method="post" action="/depart/delete/" style="display: inline"
+                                  onsubmit="return confirm('确定删除该部门吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="nid" value="{{ obj.id }}">
+                                <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}

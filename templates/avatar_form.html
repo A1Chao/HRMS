@@ -1,0 +1,95 @@
+{% extends 'layout.html' %}
+{% load avatars %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .avatar-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .avatar-page-heading h2 { margin: 0; font-size: 24px; }
+    .avatar-preview-box { text-align: center; margin-bottom: 20px; }
+    .avatar-preview-image, .avatar-preview-placeholder { width: 192px; height: 192px; border-radius: 50%; border: 1px solid #ddd; background: #f5f5f5; }
+    .avatar-preview-image { object-fit: cover; }
+    .avatar-preview-placeholder { display: inline-flex; align-items: center; justify-content: center; color: #888; font-size: 56px; }
+    .avatar-target-name { margin-top: 12px; overflow-wrap: anywhere; }
+    .avatar-delete-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eee; }
+    @media (max-width: 767px) {
+        .avatar-page-heading { align-items: flex-start; }
+        .avatar-page-heading h2 { font-size: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{# 头像属于明确关联的系统账号。multipart/form-data 才能让文件进入 request.FILES；服务器会重编码图片并重新检查授权。 #}
+    <div class="avatar-page-heading">
+        <h2>{{ title }}</h2>
+        <a class="btn btn-default" href="{{ back_url }}">返回</a>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">头像设置</div>
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-sm-4 avatar-preview-box">
+                    {% if avatar_url %}
+                        <img id="avatar-preview" class="avatar-preview-image" src="{{ avatar_url }}"
+                             alt="{{ avatar_user.display_name }}的当前头像">
+                    {% else %}
+                        <span class="avatar-preview-placeholder" role="img" aria-label="尚未设置头像">
+                            <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
+                        </span>
+                        <p class="text-muted" style="margin-top: 12px;">尚未设置头像</p>
+                    {% endif %}
+                    <p class="avatar-target-name"><strong>{{ avatar_user.display_name }}</strong></p>
+                    <p class="small text-muted">账号：{{ avatar_user.username }}</p>
+                    {% if avatar_user.employee_id %}
+                        <p class="small text-muted">员工：{{ avatar_user.employee.name }}（{{ avatar_user.employee.department.title }}）</p>
+                    {% endif %}
+                </div>
+                <div class="col-sm-8">
+                    <div class="alert alert-info" id="avatar-storage-help">
+                        新上传的头像图片内容保存在数据库中，通过受控地址读取，不使用直接 media 文件链接。
+                        上传替换或删除头像只修改头像，不会更改姓名、联系方式、角色或关联员工等其他资料。
+                    </div>
+                    {% can_manage_avatar avatar_user as can_manage_current_avatar %}
+                    {% if can_manage_current_avatar %}
+                        <form id="avatar-upload-form" method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger" role="alert">
+                                    {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-group{% if form.avatar.errors %} has-error{% endif %}">
+                                <label for="id_avatar">上传或替换头像</label>
+                                <input id="id_avatar" class="form-control" type="file" name="avatar"
+                                       accept="image/jpeg,image/png,image/webp" required
+                                       aria-describedby="avatar-upload-help avatar-upload-errors"
+                                       {% if form.avatar.errors %}aria-invalid="true"{% endif %}>
+                                <p class="help-block" id="avatar-upload-help">
+                                    仅支持 JPEG、PNG、WEBP；单张图片最大 2MB，像素总数不超过 400 万。
+                                    服务端校验后规范化为最长边不超过 512 像素的 PNG 图片。
+                                    当前头像预览仅显示服务端已保存或安全占位的图片，新文件上传成功后才会替换。
+                                </p>
+                                <div class="help-block" id="avatar-upload-errors" role="alert">
+                                    {% for error in form.avatar.errors %}<div>{{ error }}</div>{% endfor %}
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">上传并保存头像</button>
+                        </form>
+                        {% if delete_url %}
+                            <form id="avatar-delete-form" class="avatar-delete-form" method="post" action="{{ delete_url }}"
+                                  onsubmit="return confirm('确定移除当前头像吗？此操作不会修改其他资料。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">移除头像</button>
+                                <span class="small text-muted" style="margin-left: 8px;">移除后显示默认占位头像；未设置头像时也可安全执行</span>
+                            </form>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">你无权管理该账号的头像。</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

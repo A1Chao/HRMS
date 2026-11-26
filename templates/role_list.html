@@ -1,0 +1,87 @@
+{% extends 'layout.html' %}
+{% load rbac %}
+
+{% block title %}角色权限{% endblock %}
+
+{% block content %}
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap">
+        {% has_perm "role.edit" as can_edit %}
+        {% if can_edit %}
+            <a class="btn btn-success" href="/role/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新建角色
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form method="get" style="margin: 0">
+            <div class="input-group" style="width: 300px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="角色名称">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-tags" aria-hidden="true"></span>
+            角色列表（共 {{ total_count }} 个）
+            <span class="text-muted">用户 - 角色 - 权限：给角色勾选权限，再给用户分配角色</span>
+        </div>
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>角色名称</th>
+                <th>说明</th>
+                <th>拥有权限</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td>{{ obj.name }}</td>
+                    <td>{{ obj.description|default:"-" }}</td>
+                    <td>
+                        {% for perm in obj.permissions.all %}
+                            <span class="label label-default">{{ perm.code }}</span>
+                        {% empty %}
+                            <span class="text-muted">未分配权限</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if can_edit %}
+                            <a class="btn btn-primary btn-xs" href="/role/{{ obj.id }}/edit/">编辑</a>
+                            <form method="post" action="/role/delete/" style="display: inline"
+                                  onsubmit="return confirm('确定删除该角色吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="nid" value="{{ obj.id }}">
+                                <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'layout.html' %}
+{% load static %}
+
+{% block title %}数据统计{% endblock %}
+
+{% block content %}
+{# 这里只设置图表外观。后端 chart.py 先限制可见员工，再用 Count/Sum 聚合后返回 JSON，不能把全库数据塞进模板。 #}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <span class="glyphicon glyphicon-stats" aria-hidden="true"></span>
+                    部门人数分布 <span id="chart-depart-total"></span>
+                    <span class="text-muted">（按可见员工档案统计，包含部门负责人）</span>
+                </div>
+                <div class="panel-body">
+                    <div id="chart-depart" style="width: 100%; height: 360px;"></div>
+                    <ul id="chart-depart-members" class="text-muted" aria-live="polite"></ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <span class="glyphicon glyphicon-stats" aria-hidden="true"></span>
+                    各月薪资趋势
+                    <span class="text-muted">（按月份汇总实发工资）</span>
+                </div>
+                <div class="panel-body">
+                    <div id="chart-salary" style="width: 100%; height: 360px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'js/echarts.min.js' %}"></script>
+    <script>
+        // T10：ECharts 展示部门人数分布 / 各月薪资趋势，数据用 AJAX 从后端取
+        $(function () {
+            var departChart = echarts.init(document.getElementById('chart-depart'));
+            departChart.showLoading();
+            $.getJSON('/chart/depart/data/', function (res) {
+                departChart.hideLoading();
+                $('#chart-depart-total').text('（共 ' + res.total + ' 人）');
+                var memberList = $('#chart-depart-members').empty();
+                $.each(res.data, function (_, department) {
+                    var names = (res.members[department.name] || []).join('、');
+                    // 员工姓名必须按纯文本插入，不能拼成 HTML，防止存储型 XSS。
+                    $('<li>').text(department.name + '：' + department.value + ' 人（' + names + '）')
+                        .appendTo(memberList);
+                });
+                departChart.setOption({
+                    tooltip: {trigger: 'item'},
+                    legend: {bottom: 0},
+                    series: [{
+                        type: 'pie',
+                        radius: '55%',
+                        center: ['50%', '48%'],
+                        data: res.data,
+                        label: {formatter: '{b}: {c} 人 ({d}%)'}
+                    }]
+                });
+            });
+
+            var salaryChart = echarts.init(document.getElementById('chart-salary'));
+            salaryChart.showLoading();
+            $.getJSON('/chart/salary/data/', function (res) {
+                salaryChart.hideLoading();
+                salaryChart.setOption({
+                    tooltip: {trigger: 'axis'},
+                    grid: {left: 60, right: 30, top: 30, bottom: 40},
+                    xAxis: {type: 'category', data: res.data.months},
+                    yAxis: {type: 'value', name: '元'},
+                    series: [{
+                        type: 'line',
+                        smooth: true,
+                        areaStyle: {},
+                        data: res.data.totals,
+                        label: {show: true, position: 'top'}
+                    }]
+                });
+            });
+
+            // 窗口大小变化时图表跟着自适应
+            $(window).on('resize', function () {
+                departChart.resize();
+                salaryChart.resize();
+            });
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'layout.html' %}
+
+{# 通用表单页：新建 / 编辑 / 重置密码共用 #}
+{# 视图传进来的变量：title（标题）、form（表单对象）、back_url（返回按钮地址） #}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{# 部门、员工、账号等普通编辑共用此模板。GET 显示 form，POST 校验失败后再次显示原 form，字段错误由后端提供。 #}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>
+            {{ title }}
+        </div>
+        <div class="panel-body">
+            {# 有头像等文件上传字段，所以必须带 enctype #}
+            <form method="post" enctype="multipart/form-data" novalidate style="max-width: 500px">
+                {% csrf_token %}
+
+                {# 表单整体错误（例如唯一性校验失败提示） #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+                {% endif %}
+
+                {# 循环 form 里的字段：字段名、输入框、错误提示都自动生成 #}
+                {% for field in form %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="help-block">{{ field.help_text }}</p>
+                        {% endif %}
+                        {# field.errors.0 只显示这个字段的第一条错误信息 #}
+                        <span style="color: red;">{{ field.errors.0 }}</span>
+                    </div>
+                {% endfor %}
+
+                <button type="submit" class="btn btn-primary">提交</button>
+                <a href="{{ back_url|default:'/' }}" class="btn btn-default">返回</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

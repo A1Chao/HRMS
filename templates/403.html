@@ -1,0 +1,26 @@
+{% extends 'layout.html' %}
+
+{% block title %}没有权限{% endblock %}
+
+{% block content %}
+    <div class="panel panel-danger" style="margin-top: 40px;">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-lock" aria-hidden="true"></span>
+            403 没有权限
+        </div>
+        <div class="panel-body">
+            <p>当前账号没有访问该功能的权限，无法继续操作。</p>
+            <p class="text-muted">
+                请求地址：{{ path }}<br>
+                需要权限：{{ required_perm }}
+            </p>
+            <p>
+                <a href="/" class="btn btn-primary btn-sm">返回首页</a>
+                <form method="post" action="/logout/" style="display: inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-default btn-sm">切换账号</button>
+                </form>
+            </p>
+        </div>
+    </div>
+{% endblock %}

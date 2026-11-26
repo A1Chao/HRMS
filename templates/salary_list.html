@@ -1,0 +1,105 @@
+{% extends 'layout.html' %}
+{% load rbac static %}
+
+{% block title %}薪资列表{% endblock %}
+
+{% block content %}
+{# 月份选择自动 GET 筛选；total_salary 是全部匹配记录的合计，并不是当前页几个人的工资之和。 #}
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap">
+        {% has_perm "salary.edit" as can_edit %}
+        {% if can_edit %}
+            <a class="btn btn-success" href="/salary/add/">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                新增薪资
+            </a>
+        {% else %}
+            <span></span>
+        {% endif %}
+
+        <form id="salary-filter-form" method="get" style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px">
+            <select name="month" data-auto-submit aria-label="薪资月份" class="form-control" style="width: 160px">
+                <option value="">全部月份</option>
+                {% for item in months %}
+                    <option value="{{ item }}" {% if month == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+            </select>
+            <div class="input-group" style="width: 300px">
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="按员工姓名搜索">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                    </button>
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <!-- T7 统计：当前筛选结果的实发工资总额（后端用 Sum 聚合算出来） -->
+    <div class="alert alert-info">
+        当前筛选结果：共 <strong>{{ total_count }}</strong> 条，
+        实发工资总额：<strong>￥{{ total_salary }}</strong>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <span class="glyphicon glyphicon-yen" aria-hidden="true"></span>
+            薪资列表
+            <span class="text-muted">实发工资 = 基本工资 + 奖金 - 扣款（保存时自动计算）</span>
+        </div>
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>员工</th>
+                <th>所属部门</th>
+                <th>月份</th>
+                <th>基本工资</th>
+                <th>奖金</th>
+                <th>扣款</th>
+                <th>实发工资</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for obj in queryset %}
+                <tr>
+                    <th>{{ obj.id }}</th>
+                    <td>{{ obj.employee.name }}</td>
+                    <td>{{ obj.employee.department.title }}</td>
+                    <td>{{ obj.month }}</td>
+                    <td>{{ obj.base_salary }}</td>
+                    <td>{{ obj.bonus }}</td>
+                    <td>{{ obj.deduction }}</td>
+                    <td><strong>{{ obj.total }}</strong></td>
+                    <td>
+                        {% if can_edit %}
+                            <a class="btn btn-primary btn-xs" href="/salary/{{ obj.id }}/edit/">编辑</a>
+                            <form method="post" action="/salary/delete/" style="display: inline"
+                                  onsubmit="return confirm('确定删除该薪资记录吗？');">
+                                {% csrf_token %}
+                                <input type="hidden" name="nid" value="{{ obj.id }}">
+                                <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">只读</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted">暂无数据</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_string %}
+        <ul class="pagination">
+            {{ page_string|safe }}
+        </ul>
+    {% endif %}
+{% endblock %}
+{% block extra_js %}
+    <script src="{% static 'js/list-filters.js' %}"></script>
+{% endblock %}

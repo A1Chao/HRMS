@@ -1,0 +1,225 @@
+{% extends 'layout.html' %}
+{% load rbac %}
+
+{% block title %}任务列表{% endblock %}
+
+{% block extra_css %}
+<style>
+    #task-tbody tr.task-completed > td {
+        color: #999;
+        background-color: #f5f5f5;
+        filter: grayscale(100%);
+        opacity: .72;
+    }
+    #task-tbody tr.task-completed .task-title { text-decoration: line-through; }
+    .task-action-form { display: inline-block; margin: 0 3px 3px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+{# 任务表单由 AJAX 提交。个人/部门二选一；校验失败只把 JSON 错误放到输入框旁边，不刷新整页。 #}
+    {% has_perm "task.edit" as can_edit %}
+    <div class="row">
+        <div class="col-md-5">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                    派发任务（个人 / 部门组二选一）
+                </div>
+                <div class="panel-body">
+                    {% if can_edit %}
+                        <form id="task-form" novalidate>
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="level">级别</label>
+                                <select class="form-control" id="level" name="level">
+                                    <option value="1">紧急</option>
+                                    <option value="2">重要</option>
+                                    <option value="3" selected>普通</option>
+                                </select>
+                                <span id="error-level" class="text-danger"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="title">标题</label>
+                                <input type="text" class="form-control" id="title" name="title" placeholder="标题">
+                                <span id="error-title" class="text-danger"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="detail">详情</label>
+                                <textarea class="form-control" id="detail" name="detail" rows="4" placeholder="详情"></textarea>
+                                <span id="error-detail" class="text-danger"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="target_type">派发方式</label>
+                                <select class="form-control" id="target_type" name="target_type">
+                                    <option value="user" selected>派发给个人</option>
+                                    <option value="department">派发给部门组</option>
+                                </select>
+                                <span id="error-target_type" class="text-danger"></span>
+                            </div>
+                            <div class="form-group" id="assignee-user-group">
+                                <label for="assignee">个人负责人</label>
+                                <select class="form-control" id="assignee" name="assignee">
+                                    <option value="">-- 请选择个人 --</option>
+                                    {% for item in users %}
+                                        <option value="{{ item.id }}">{{ item.task_assignee_label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <span id="error-assignee" class="text-danger"></span>
+                            </div>
+                            <div class="form-group" id="assignee-department-group" style="display: none;">
+                                <label for="assignee_department">负责人组（部门）</label>
+                                <select class="form-control" id="assignee_department" name="assignee_department" disabled>
+                                    <option value="">-- 请选择部门组 --</option>
+                                    {% for item in departments %}
+                                        <option value="{{ item.id }}"{% if not item.recipient_count %} disabled{% endif %}>
+                                            {{ item.title }}{% if item.recipient_count %}（{{ item.recipient_count }} 个接收账号）{% else %}（暂无有效接收账号）{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <span id="error-assignee_department" class="text-danger"></span>
+                            </div>
+                            <button type="submit" class="btn btn-primary">派发任务</button>
+                            <span id="error-common" class="text-danger" style="margin-left: 10px;"></span>
+                        </form>
+                    {% else %}
+                        <p class="text-muted">当前账号可以查看并更新派给本人或本人所属部门组的任务，不能派发或删除任务。</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span>
+                    任务列表（未完成优先，已完成自动下沉）
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" style="margin-bottom: 0">
+                        <thead>
+                        <tr>
+                            <th>级别</th>
+                            <th>标题</th>
+                            <th>详情</th>
+                            <th>派发对象</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="task-tbody">
+                        {% for obj in queryset %}
+                            <tr{% if obj.is_completed %} class="task-completed"{% endif %}>
+                                <td>{{ obj.get_level_display }}</td>
+                                <td class="task-title">{{ obj.title }}</td>
+                                <td title="{{ obj.detail }}">{{ obj.detail|truncatechars:30 }}</td>
+                                <td>{{ obj.dispatch_target_display }}</td>
+                                <td>
+                                    {% if obj.is_completed %}
+                                        <span class="label label-default">已完成</span>
+                                    {% else %}
+                                        <span class="label label-warning">未完成</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ obj.create_time|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if obj.can_update_status %}
+                                        <form class="task-action-form" method="post" action="/task/{{ obj.id }}/status/">
+                                            {% csrf_token %}
+                                            {% if obj.is_completed %}
+                                                <input type="hidden" name="completed" value="0">
+                                                <button type="submit" class="btn btn-default btn-xs">恢复未完成</button>
+                                            {% else %}
+                                                <input type="hidden" name="completed" value="1">
+                                                <button type="submit" class="btn btn-success btn-xs">标记完成</button>
+                                            {% endif %}
+                                        </form>
+                                    {% endif %}
+                                    {% if obj.can_delete %}
+                                        <form class="task-action-form" method="post" action="/task/{{ obj.id }}/delete/"
+                                              onsubmit="return confirm('确定删除该任务吗？');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger btn-xs">删除</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr id="empty-row">
+                                <td colspan="7" class="text-center text-muted">暂无任务</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="text-muted">当前筛选共 {{ total_count }} 条任务</div>
+    <form method="get" class="form-inline" style="margin-top: 10px;">
+        <label for="completed-filter">完成状态：</label>
+        <select name="completed" id="completed-filter" class="form-control">
+            <option value="" {% if completed_filter == '' %}selected{% endif %}>全部</option>
+            <option value="0" {% if completed_filter == '0' %}selected{% endif %}>未完成</option>
+            <option value="1" {% if completed_filter == '1' %}selected{% endif %}>已完成</option>
+        </select>
+        <button type="submit" class="btn btn-default">筛选</button>
+    </form>
+    {% if page_string %}<ul class="pagination">{{ page_string|safe }}</ul>{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    {% if can_edit %}
+    <script>
+        $(function () {
+            function updateTargetFields() {
+                var useDepartment = $('#target_type').val() === 'department';
+                $('#assignee-user-group').toggle(!useDepartment);
+                $('#assignee').prop('disabled', useDepartment);
+                $('#assignee-department-group').toggle(useDepartment);
+                $('#assignee_department').prop('disabled', !useDepartment);
+            }
+
+            $('#target_type').on('change', function () {
+                $('#assignee').val('');
+                $('#assignee_department').val('');
+                updateTargetFields();
+            });
+            updateTargetFields();
+
+            $('#task-form').on('submit', function (event) {
+                // 阻止浏览器默认整页 POST，下面改用 $.ajax 发请求。
+                event.preventDefault();
+                $('[id^=error-]').text('');
+
+                $.ajax({
+                    url: '/task/ajax/add/',
+                    type: 'POST',
+                    // serialize 会带上隐藏的 csrfmiddlewaretoken 和所有启用的表单字段。
+                    data: $(this).serialize(),
+                    dataType: 'json',
+                    success: function (res) {
+                        if (!res.status) {
+                            $.each(res.errors, function (field, messages) {
+                                if (field === '__all__') {
+                                    $('#error-common').text(messages[0]);
+                                } else {
+                                    $('#error-' + field).text(messages[0]);
+                                }
+                            });
+                            return;
+                        }
+
+                        // 仅成功后回首页刷新分页与计数；校验失败的分支已在上面 return，不会刷新。
+                        window.location.assign('/task/list/');
+                    },
+                    error: function () {
+                        $('#error-common').text('请求失败，请稍后重试');
+                    }
+                });
+            });
+        });
+    </script>
+    {% endif %}
+{% endblock %}

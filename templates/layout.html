@@ -1,0 +1,214 @@
+{% load static rbac avatars %}
+{# 所有列表继承本布局。导航按钮靠 has_perm 隐藏，但真正权限仍由中间件/对象范围保护；content 和 extra_js 是子模板填入的插槽。 #}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}企业员工管理系统{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'plugins/bootstrap-3.4.1/css/bootstrap.min.css' %}">
+    <style>
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #ddd; object-fit: cover; background: #f5f5f5; vertical-align: middle; }
+        .navbar-avatar { width: 28px; height: 28px; margin-right: 6px; }
+        .navbar-nav > li > a.user-profile-toggle { padding-top: 11px; padding-bottom: 11px; line-height: 28px; }
+        .account-with-avatar { display: inline-flex; align-items: center; gap: 6px; }
+        .employee-avatar-cell { text-align: center; }
+        .employee-avatar-cell .avatar-manage-link { display: inline-block; margin-top: 6px; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="/">企业员工管理系统</a>
+    </div>
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+      <ul class="nav navbar-nav">
+        {# 前端按权限隐藏菜单：没有对应权限就不显示入口（T5） #}
+        {% has_perm "chart.view" as p_chart %}
+        {% if p_chart %}<li><a href="/chart/">数据统计</a></li>{% endif %}
+
+        {% has_perm "depart.view" as p_depart %}
+        {% if p_depart %}<li><a href="/depart/list/">部门管理</a></li>{% endif %}
+
+        {% has_perm "employee.view" as p_emp %}
+        {% if p_emp %}<li><a href="/user/list/">员工管理</a></li>{% endif %}
+
+        {% has_perm "attendance.view" as p_att %}
+        {% if p_att %}<li><a href="/attendance/list/">考勤管理</a></li>{% endif %}
+
+        {% has_perm "salary.view" as p_sal %}
+        {% if p_sal %}<li><a href="/salary/list/">薪资管理</a></li>{% endif %}
+
+        {% has_perm "notice.view" as p_notice %}
+        {% if p_notice %}<li><a href="/notice/list/">公告管理</a></li>{% endif %}
+
+        {% has_perm "task.view" as p_task %}
+        {% if p_task %}<li><a href="/task/list/">任务管理</a></li>{% endif %}
+
+        {% has_perm "user.view" as p_user %}
+        {% has_perm "role.view" as p_role %}
+        {% if p_user or p_role %}
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+            系统设置 <span class="caret"></span>
+          </a>
+          <ul class="dropdown-menu">
+            {% if p_user %}<li><a href="/admin/list/">系统用户</a></li>{% endif %}
+            {% if p_role %}<li><a href="/role/list/">角色权限</a></li>{% endif %}
+          </ul>
+        </li>
+        {% endif %}
+      </ul>
+
+      <ul class="nav navbar-nav navbar-right">
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle user-profile-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+            {% if request.user.is_authenticated and request.user.is_active %}
+              <img class="user-avatar navbar-avatar" src="{% url 'avatar_image' request.user.id %}" alt="" aria-hidden="true">
+            {% endif %}
+            {{ request.user.display_name|default:"未命名" }} <span class="caret"></span>
+          </a>
+          <ul class="dropdown-menu">
+            <li><a href="#">角色：{{ request.user.role_names|join:" / "|default:"-" }}</a></li>
+            {% if request.user.is_authenticated and request.user.is_active %}
+              <li><a href="{% url 'my_avatar' %}">我的头像</a></li>
+            {% endif %}
+            <li role="separator" class="divider"></li>
+            {# 13.4 注销：清空 session 后回到登录页 #}
+            <li>
+              <form method="post" action="/logout/" style="margin: 0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link" style="width: 100%; text-align: left; padding: 3px 20px; color: #333; text-decoration: none;">注销</button>
+              </form>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible" role="alert">
+                <button type="button" class="close" data-dismiss="alert" aria-label="关闭"><span aria-hidden="true">&times;</span></button>
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+</div>
+
+{% if pending_notice_notifications or pending_task_notifications %}
+<div class="modal fade" id="system-notification-modal" tabindex="-1" role="dialog"
+     aria-labelledby="system-notification-title" data-backdrop="static" data-keyboard="false">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="system-notification-title">
+          <span class="glyphicon glyphicon-bell" aria-hidden="true"></span>
+          待确认提醒
+        </h4>
+      </div>
+      <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+        {% if pending_notice_notifications %}
+          <h4>未读公告 <span class="badge">{{ pending_notice_notifications|length }}</span></h4>
+          {% for notice_item in pending_notice_notifications %}
+            <div class="alert alert-info" style="margin-bottom: 10px;">
+              <h4 style="margin-top: 0;">{{ notice_item.title }}</h4>
+              <p class="small text-muted">
+                发布人：{{ notice_item.publisher.display_name }}　
+                发布时间：{{ notice_item.create_time|date:"Y-m-d H:i" }}
+              </p>
+              <div>{{ notice_item.content|linebreaksbr }}</div>
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if pending_task_notifications %}
+          <h4 style="margin-top: 20px;">新派发任务 <span class="badge">{{ pending_task_notifications|length }}</span></h4>
+          {% for task_item in pending_task_notifications %}
+            <div class="alert alert-warning" style="margin-bottom: 10px;">
+              <h4 style="margin-top: 0;">
+                {{ task_item.title }}
+                <span class="label label-danger">{{ task_item.get_level_display }}</span>
+                {% if task_item.is_completed %}<span class="label label-default">已完成</span>{% endif %}
+              </h4>
+              <div>{{ task_item.detail|linebreaksbr }}</div>
+              <p class="small text-muted" style="margin: 8px 0 0;">
+                派发对象：{{ task_item.dispatch_target_display }}　
+                派发时间：{{ task_item.create_time|date:"Y-m-d H:i" }}
+              </p>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <form id="notification-read-form" method="post" action="/notifications/read/" style="margin: 0;">
+          {% csrf_token %}
+          {% for notice_item in pending_notice_notifications %}
+            <input type="hidden" name="notice_ids" value="{{ notice_item.id }}">
+          {% endfor %}
+          {% for task_item in pending_task_notifications %}
+            <input type="hidden" name="task_ids" value="{{ task_item.id }}">
+          {% endfor %}
+          <span id="notification-read-error" class="text-danger" style="margin-right: 10px;"></span>
+          <button type="submit" class="btn btn-primary" id="notification-read-submit">
+            我已阅读并知晓
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+<script src="{% static 'plugins/bootstrap-3.4.1/js/bootstrap.min.js' %}"></script>
+{% block extra_js %}{% endblock %}
+{% if pending_notice_notifications or pending_task_notifications %}
+<script>
+  $(function () {
+    var modal = $('#system-notification-modal');
+    var form = $('#notification-read-form');
+    var submitButton = $('#notification-read-submit');
+    var errorBox = $('#notification-read-error');
+
+    modal.modal({backdrop: 'static', keyboard: false, show: true});
+    form.on('submit', function (event) {
+      event.preventDefault();
+      errorBox.text('');
+      submitButton.prop('disabled', true).text('正在确认...');
+
+      $.ajax({
+        url: form.attr('action'),
+        type: 'POST',
+        data: form.serialize(),
+        dataType: 'json',
+        success: function (res) {
+          if (res.status) {
+            modal.modal('hide');
+            return;
+          }
+          errorBox.text('确认失败，请重试');
+          submitButton.prop('disabled', false).text('我已阅读并知晓');
+        },
+        error: function () {
+          errorBox.text('网络异常，未确认前提醒不会关闭');
+          submitButton.prop('disabled', false).text('我已阅读并知晓');
+        }
+      });
+    });
+  });
+</script>
+{% endif %}
+</body>
+</html>

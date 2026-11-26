@@ -1,0 +1,24 @@
+# Python 缓存、环境与编辑器设置
+__pycache__/
+*.py[cod]
+.venv*/
+venv/
+.idea/
+.vscode/
+
+# 本机凭据、日志、上传文件、测试数据库与构建产物
+.env
+.env.*
+*.log
+logs/
+media/
+staticfiles/
+*.sqlite3
+*.sqlite3-journal
+
+# 本机运维/测试和审计输出（可能含人事资料或初始密码，不能公开提交）
+.ops/
+.test-tmp/
+.permission-recovery/
+reports/
+.dsh-backup-*
